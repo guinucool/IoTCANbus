@@ -47,6 +47,10 @@ def extractBits(number: int, bits: int, index: int) -> int:
     # Return the desired number
     return shift & mask
 
+# Exception that sinalizes a missing id on the officer
+class NoAgentForGivenId(Exception):
+    pass
+
 # Class that defines the acting agent
 class Agent:
 
@@ -170,5 +174,46 @@ class Agent:
 class Officer:
 
     # Constructor of the acting officer
-    def __init__(self):
-        pass
+    def __init__(self, agents: list = []):
+
+        # List of agents known to the acting officer
+        self.__agents = agents
+
+    # Get agent of given id or none in case of none existence
+    def __getAgent(self, id: int) -> Agent | None:
+
+        # Check which agent has the requested id
+        for ag in self.__agents:
+
+            # Check if the agent has the request id
+            if ag.hasId(id):
+                return ag
+            
+        # In case there is no agent with the given id
+        return None
+
+    # Initialization of an agent of the list
+    def initialize(self, id: int, seed: int) -> None:
+
+        # Get the agent associated to the id
+        ag = self.__getAgent(id)
+
+        # Check if it exists
+        if ag is None:
+            raise NoAgentForGivenId()
+        
+        # Initialization of the agent
+        ag.initialize(seed)
+    
+    # Check if the received id checks out with the correspondent IBN
+    def check(self, id: int, ibn: int) -> bool:
+
+        # Get the agent for the given id
+        ag = self.__getAgent(id)
+
+        # Check if the id is associated to any agent
+        if ag is None:
+            return False
+        
+        # Check if the IBN checks out
+        return ag.check(id, ibn)
