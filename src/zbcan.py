@@ -132,7 +132,7 @@ class Agent:
         prioSpan = span[priority + 1] - span[priority]
 
         # Get the extract for the calculation of the sequence
-        extract = extractBits(self.__seq[id], log2(prioSpan), self.__index[id])
+        extract = extractBits(self.__seq[id], int(log2(prioSpan)), self.__index[id])
 
         # Calculate the desired IBN
         return span[priority] + extract
