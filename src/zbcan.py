@@ -180,7 +180,7 @@ class Agent:
         current = self.__getCurrent(id)
         
         # Check if the IBN does not check out (because of the ms, it may happen a delay)
-        if ibn != current and ibn != current + 1:
+        if ibn != current:
             return False
         
         # Update the index in case it does

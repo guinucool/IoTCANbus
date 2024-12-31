@@ -281,7 +281,7 @@ class ClockECU():
                 self.__ecu.send(Message(arbitration_id= 0, data= intToDataBytes(self.__clock.time())))
 
                 # Check if any message is sent
-                msg = self.__ecu.rcv(0.02)
+                msg = self.__ecu.rcv(0.01)
 
                 # Check if timer is reseted or ticked
                 if msg is None:
