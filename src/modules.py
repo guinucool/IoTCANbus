@@ -10,7 +10,7 @@ agents = [
     Agent(1570050167, [10, 31]),
     Agent(896026477, [13]),
     Agent(466217088, [12, 129]),
-    Agent(2102876160, [])
+    Agent(2102876160, [14])
 ]
 
 # Emulation of the motor termometer
@@ -72,7 +72,7 @@ def vehicleController():
             cmd = input('Insert command: ')
 
             # Check if command is valid
-            if cmd in ['A', 'B', 'L', 'R', 'D', 'F', 'T']:
+            if cmd in ['A', 'B', 'N', 'L', 'R', 'D', 'F', 'T']:
 
                 # Message placeholder for future message
                 msg = None
@@ -84,7 +84,7 @@ def vehicleController():
                     # Accelaration, braking or neutral command
                     msg = Message(arbitration_id= 30, data= [ord(cmd)])
 
-                if cmd in ['L', 'R']:
+                if cmd in ['N', 'L', 'R']:
 
                     # Left and right signal
                     msg = Message(arbitration_id=128, data= [ord(cmd)])
@@ -214,8 +214,6 @@ def cooler():
                 # Check the temperature of the instruction
                 temp = dataBytesToInt(msg.data)
 
-                # Depending on the temperature update the system
-
                 if temp > 90:
 
                     # Start cooling (simulated)
@@ -225,6 +223,96 @@ def cooler():
 
                     # Stop cooling (simulated)
                     print('Stop cooling...')
+
+    except KeyboardInterrupt:
+
+        # Information of normal closing
+        print('The ECU finished normally!')
+
+    except ECUInBusOffMode:
+
+        # In case of failure of the ECU
+        print('The ECU crashed into Bus Off Mode!')
+
+    finally:
+
+        # Closing of the ECU connection to the CAN bus
+        agent.close()
+
+# Emulation of the vehicle dashboard
+def dashboard():
+
+    # Creation of the operating ECU
+    agent = AgentECU('vcan0', 'socketcan', 14, agents[4])
+
+    # Initialization of the ECU
+    agent.initialize()
+
+    # State of the dashboard
+    signal = 'N'
+    vel = 0
+    doors = -1
+    lightF = -1
+    lightB = -1
+
+    # Print state of the dashboard
+    print(f'Velocity: {vel} km/h')
+    print(f'Doors: {doors}')
+    print(f'LightF: {lightF}')
+    print(f'LightB: {lightB}')
+    print(f'Signal: {signal}')
+
+    try:
+
+        # Simulation of the dashboard system
+        while True:
+
+            # Wait for an instruction
+            msg = agent.rcv()
+
+            # Evaluate the instruction
+            if msg is not None and (msg.arbitration_id == 128 or msg.arbitration_id == 129 or msg.arbitration_id == 1024 or msg.arbitration_id == 1025):
+
+                # Check if it is an instruction or a velocity measure
+                
+                if msg.arbitration_id == 129:
+
+                    # Check the velocity of the instruction
+                    vel = dataBytesToInt(msg.data)
+
+                # In case it is a signal instruction
+                elif msg.arbitration_id == 128:
+
+                    # Get the command
+                    cmd = chr(msg.data[0])
+
+                    # Update the signal state
+                    signal = cmd
+
+                # In case it is a door instruction
+                elif msg.arbitration_id == 1024:
+
+                    # Update the doors lock
+                    doors = -doors
+
+                # In case it is a light instruction
+                else:
+
+                    # Get the lights needed to be updated
+                    light = chr(msg.data[0])
+
+                    # Update the correct lights
+                    if light == 'F':
+                        lightF = -lightF
+                    else:
+                        lightB = -lightB
+
+                # Print state of the dashboard
+                print(f'Velocity: {vel} km/h')
+                print(f'Doors: {doors}')
+                print(f'LightF: {lightF}')
+                print(f'LightB: {lightB}')
+                print(f'Signal: {signal}')
 
     except KeyboardInterrupt:
 
