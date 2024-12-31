@@ -192,8 +192,6 @@ class Agent:
     # Check if an id belongs to the agent
     def hasId(self, id: int) -> bool:
         return (id in self.__ids)
-    
-    # Gets one id that belongs to the agent
 
 # Class that defines the acting officer
 class Officer:
@@ -242,3 +240,30 @@ class Officer:
         
         # Check if the IBN checks out
         return ag.check(id, ibn)
+    
+# Emulator of a global clock for the whole channel
+class Clock:
+
+    # Constructor of the clock
+    def __init__(self):
+        
+        # Define the current timer
+        self.__time = 0
+
+    # Increase the timer of the clock
+    def tick(self):
+
+        # Increase timer
+        self.__time += 1
+
+        # Check if the limit is reached
+        self.__time = self.__time % span[-1]
+
+    # Get the current timer
+    def time(self):
+        return self.__time
+    
+    # Reset the timer
+    def reset(self):
+        self.__time = 0
+

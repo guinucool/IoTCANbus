@@ -1,5 +1,5 @@
-from time import time
-from zbcan import Agent, Officer, AgentAlreadyInitialized, NoAgentForGivenId
+from time import time, sleep
+from zbcan import Agent, Officer, AgentAlreadyInitialized, NoAgentForGivenId, Clock
 from can.exceptions import CanOperationError
 from can.interface import Bus
 from can import Message
@@ -39,6 +39,13 @@ class ECU:
 
         # Condition for bus off mode
         return (self.__tec > 127 or self.__rec > 127)
+    
+    # Flush the output buffer
+    def flush(self) -> None:
+        
+        # Flush all the stored messages
+        while self.__bus.recv(0.001) is not None:
+            pass
 
     # Receiving of messages from the bus
     def rcv(self, timeout: float = None) -> None | Message:
@@ -134,20 +141,29 @@ class AgentECU(ECU):
                 # Ignore errors
                 pass
 
+    # Synch with the officer clock
+    def __synch(self, ibn: int) -> None:
+
+        # Placeholder for message
+        msg = None
+
+        # Flush the output buffer
+        super().flush()
+
+        # Wait for a message or for clock synch
+        while msg is None or msg.arbitration_id != 0 or (msg.arbitration_id == 0 and dataBytesToInt(msg.data) != ibn):
+            msg = super().rcv()
+
     # Send a message to the bus
     def send(self, msg: Message) -> None:
 
+        # Get the current IBN span
+        ibn = self.__agent.current(msg.arbitration_id)
+
         try:
 
-            # Wait for a message or for clock synch
-            super().rcv()
-
-            # Get the current IBN span
-            ibn = self.__agent.current(msg.arbitration_id)
-
-            # Wait the time needed without messages to send the messages
-            while super().rcv(ibn * 0.01) is not None:
-                pass
+            # Synch the clock
+            self.__synch(ibn)
 
             # Send the message after confirming the time
             super().send(msg)
@@ -178,23 +194,20 @@ class OfficerECU():
     # Officer opperation
     def operate(self) -> None:
 
+        # Most recent timemark
+        current = 0
+
         # In case a general error occurs
         try:
 
             # Keeps looking as long as the system works
             while True:
-                
-                # Get the current timestamp before collecting the message
-                before = current_time_milli()
 
                 # Waits for a message to verify
-                msg = self.__ecu.rcv(1.28)
-
-                # Get the current timestamp after collecting the message
-                after = current_time_milli()
+                msg = self.__ecu.rcv()
 
                 # Checks if the message arrive
-                if msg is not None:
+                if msg.arbitration_id != 0:
 
                     # In case an attacker tries to forge the initialization
                     try:
@@ -209,7 +222,7 @@ class OfficerECU():
                         else:
 
                             # Calculate the IBN and check it for message id
-                            if not self.__officer.check(msg.arbitration_id, after - before):
+                            if not self.__officer.check(msg.arbitration_id, current):
                                 self.__handler(msg)
 
                     except NoAgentForGivenId | AgentAlreadyInitialized:
@@ -217,11 +230,10 @@ class OfficerECU():
                         # Handle the incoherent message
                         self.__handler(msg)
 
-                # If no message arrive, resets the clock
                 else:
 
-                    # Sends the clock reset message
-                    self.__ecu.send(Message(arbitration_id= 0, data= [0x00]))
+                    # In case it is a clock message
+                    current = dataBytesToInt(msg.data)
 
         except CanOperationError:
 
@@ -229,5 +241,49 @@ class OfficerECU():
             self.operate()
 
     # Officer shutdown
+    def close(self):
+        self.__ecu.close()
+
+# Emulator for the clock
+class ClockECU():
+
+    # Constructor for the clock ECU
+    def __init__(self, channel: str, interface: str):
+
+        # Create the ecu to communicate with the channel
+        self.__ecu = ECU(channel, interface)
+        
+        # Create the clock
+        self.__clock = Clock()
+
+    # Operation of the clock
+    def operate(self):
+
+        # Loops until the end of the program
+        while True:
+
+            try:
+
+                # Send the clock signal
+                self.__ecu.send(Message(arbitration_id= 0, data= intToDataBytes(self.__clock.time())))
+
+                # Check if any message is sent
+                msg = self.__ecu.rcv(0.02)
+
+                # Check if timer is reseted or ticked
+                if msg is None:
+                    self.__clock.tick()
+                else:
+
+                    # ZeroPoint calibration
+                    sleep(0.2)
+                    self.__clock.reset()
+
+            except CanOperationError:
+
+                # Ignore error and retry
+                pass
+
+    # Closing of the bus channel of the clock
     def close(self):
         self.__ecu.close()
