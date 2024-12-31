@@ -51,11 +51,19 @@ def extractBits(number: int, bits: int, index: int) -> int:
 class NoAgentForGivenId(Exception):
     pass
 
+# Exception that sinalizes a already initialized agent
+class AgentAlreadyInitialized(Exception):
+    pass
+
+# Exception that sinalizes an id not present in an agent
+class NoIdInAgent(Exception):
+    pass
+
 # Class that defines the acting agent
 class Agent:
 
     # Constructor of the acting agent
-    def __init__(self, key: int, ids: set = set()):
+    def __init__(self, key: int, ids: set):
 
         # Secret IBN defining key
         self.__key = key
@@ -77,6 +85,10 @@ class Agent:
 
     # Definition of all the necessary information for the sequence
     def initialize(self, seed: int = None) -> int:
+
+        # Check if the agent is already not initialized
+        if self.__seed is not None:
+            raise AgentAlreadyInitialized()
         
         # Check if the seed was given for initialization
         if seed is None:
@@ -120,7 +132,7 @@ class Agent:
         
         # Check if index has reached maximum value
         if self.__index[id] == 32:
-            self.__refresh()
+            self.__refresh(id)
 
         # If not, increase by one
         else:
@@ -143,6 +155,10 @@ class Agent:
 
     # Get the current IBN and update the index
     def current(self, id: int) -> int:
+
+        # Check for existence of the asked id
+        if not self.hasId(id):
+            raise NoIdInAgent()
         
         # Calculate the current IBN
         ibn = self.__getCurrent(id)
@@ -155,9 +171,16 @@ class Agent:
 
     # Check if the current IBN checks out and update the index
     def check(self, id: int, ibn: int) -> bool:
+
+        # Check for existence of the asked id
+        if not self.hasId(id):
+            raise NoIdInAgent()
         
-        # Check if the IBN does not check out
-        if ibn != self.__getCurrent(id):
+        # Get the current IBN
+        current = self.__getCurrent(id)
+        
+        # Check if the IBN does not check out (because of the ms, it may happen a delay)
+        if ibn != current and ibn != current + 1:
             return False
         
         # Update the index in case it does
@@ -169,12 +192,14 @@ class Agent:
     # Check if an id belongs to the agent
     def hasId(self, id: int) -> bool:
         return (id in self.__ids)
+    
+    # Gets one id that belongs to the agent
 
 # Class that defines the acting officer
 class Officer:
 
     # Constructor of the acting officer
-    def __init__(self, agents: list = []):
+    def __init__(self, agents: list):
 
         # List of agents known to the acting officer
         self.__agents = agents
