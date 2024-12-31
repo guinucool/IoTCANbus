@@ -173,6 +173,19 @@ class AgentECU(ECU):
             # Retry in case of failure
             self.send(msg)
 
+    # Receive a message from the CAN bus
+    def rcv(self, timeout: float = None) -> Message | None:
+
+        try:
+
+            # Try to return the message
+            return super().rcv(timeout)
+        
+        except CanOperationError:
+
+            # Retry in case of error
+            self.rcv(timeout)
+
 # Class that emulates the behaviour of the Officer ECU
 class OfficerECU():
 

@@ -1,6 +1,6 @@
 from random import randint
 from zbcan import Agent
-from ecu import AgentECU, intToDataBytes, ECUInBusOffMode, OfficerECU, ECU, ClockECU
+from ecu import AgentECU, intToDataBytes, ECUInBusOffMode, OfficerECU, ECU, ClockECU, dataBytesToInt
 from can import Message
 from time import sleep
 
@@ -8,9 +8,8 @@ from time import sleep
 agents = [
     Agent(1222848320, [11, 30, 128, 1024, 1025]),
     Agent(1570050167, [10, 31]),
-    Agent(896026477, []),
+    Agent(896026477, [13]),
     Agent(466217088, [12, 129]),
-    Agent(1460528862, [130]),
     Agent(2102876160, [])
 ]
 
@@ -73,14 +72,14 @@ def vehicleController():
             cmd = input('Insert command: ')
 
             # Check if command is valid
-            if cmd in ['A', 'B', 'N', 'L', 'R', 'D', 'F', 'T']:
+            if cmd in ['A', 'B', 'L', 'R', 'D', 'F', 'T']:
 
                 # Message placeholder for future message
                 msg = None
 
                 # Creates the message based on the command
 
-                if cmd in ['A', 'B', 'N']:
+                if cmd in ['A', 'B']:
 
                     # Accelaration, braking or neutral command
                     msg = Message(arbitration_id= 30, data= [ord(cmd)])
@@ -132,9 +131,6 @@ def wheels():
     # Initialization of the ECU
     agent.initialize()
 
-    # State of the wheels
-    state = 'N'
-
     # Velocity of the wheels
     vel = 0
 
@@ -144,41 +140,91 @@ def wheels():
         while True:
 
             # Wait for an instruction
-            sleep(7)
+            msg = agent.rcv()
 
             # Evaluate the instruction
-            #if msg is not None and msg.arbitration_id == 30:
+            if msg is not None and msg.arbitration_id == 30:
 
                 # Change the state to the state of the instruction
-                #state = chr(msg.data[0])
+                state = chr(msg.data[0])
 
-            # Depending on the state update the velocity
+                # Depending on the state update the velocity
 
-            if state == 'A' and vel < 200:
+                if state == 'A' and vel < 200:
 
-                # Generate a random accelaration
-                a = randint(0, 10)
+                    # Generate a random accelaration
+                    a = randint(0, 10)
 
-                # Association of this accelaration to the velocity
-                vel += a
+                    # Association of this accelaration to the velocity
+                    vel += a
 
-            if state == 'B' and vel > 0:
+                if state == 'B' and vel > 0:
 
-                # Generate a random braking
-                b = randint(0, 10)
+                    # Generate a random braking
+                    b = randint(0, 10)
 
-                # Association of this breaking to the velocity
-                vel += a
+                    # Association of this breaking to the velocity
+                    vel -= a
 
-                # Check if velocity is above 0
-                if vel < 0:
-                    vel = 0
+                    # Check if velocity is above 0
+                    if vel < 0:
+                        vel = 0
 
-            # Print the temperature reading
-            print(f'Current Velocity - {vel} km/h')
+                # Print the temperature reading
+                print(f'Current Velocity - {vel} km/h')
 
-            # Send the velocity to the dashboard
-            agent.send(Message(arbitration_id= 129, data= intToDataBytes(vel)))
+                # Send the velocity to the dashboard
+                agent.send(Message(arbitration_id= 129, data= intToDataBytes(vel)))
+
+    except KeyboardInterrupt:
+
+        # Information of normal closing
+        print('The ECU finished normally!')
+
+    except ECUInBusOffMode:
+
+        # In case of failure of the ECU
+        print('The ECU crashed into Bus Off Mode!')
+
+    finally:
+
+        # Closing of the ECU connection to the CAN bus
+        agent.close()
+
+# Emulation of the cooling system for the motor
+def cooler():
+
+    # Creation of the operating ECU
+    agent = AgentECU('vcan0', 'socketcan', 13, agents[2])
+
+    # Initialization of the ECU
+    agent.initialize()
+
+    try:
+
+        # Simulation of the cooler system
+        while True:
+
+            # Wait for an instruction
+            msg = agent.rcv()
+
+            # Evaluate the instruction
+            if msg is not None and msg.arbitration_id == 31:
+
+                # Check the temperature of the instruction
+                temp = dataBytesToInt(msg.data)
+
+                # Depending on the temperature update the system
+
+                if temp > 90:
+
+                    # Start cooling (simulated)
+                    print('Cooling down!')
+
+                else:
+
+                    # Stop cooling (simulated)
+                    print('Stop cooling...')
 
     except KeyboardInterrupt:
 
